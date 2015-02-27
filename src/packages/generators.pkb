@@ -130,5 +130,53 @@ begin
     end loop;
 end generate_series;
 
+-- Generate fibonacci numbers in a range
+function generate_fibonacci(
+    p_min in number,
+    p_max in number) return xtras_numbers_t pipelined
+as
+    l_a number := 0;
+    l_b number := 1;
+    l_next number;
+begin
+    if p_min <= 1 then
+        pipe row(1);
+    end if;
+    
+    loop
+        l_next := l_a + l_b;
+        l_a := l_b;
+        l_b := l_next;
+        exit when l_next > p_max;
+        if l_next > p_min then
+            pipe row(l_next);
+        end if;
+    end loop;
+end generate_fibonacci;
+
+-- Generate the first N fibonacci numbers
+function generate_fibonacci(
+    p_length in pls_integer) return xtras_numbers_t pipelined
+as
+    l_a number := 0;
+    l_b number := 1;
+    l_next number;
+    l_idx pls_integer := 0;
+begin
+    if p_length >= 1 then
+        pipe row(1);
+        l_idx := l_idx + 1;
+    end if;
+    
+    loop
+        l_next := l_a + l_b;
+        l_a := l_b;
+        l_b := l_next;
+        l_idx := l_idx + 1;
+        exit when l_idx > p_length;
+        pipe row(l_next);
+    end loop;
+end generate_fibonacci;
+
 end xtras_generators;
 /

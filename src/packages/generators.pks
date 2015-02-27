@@ -52,5 +52,14 @@ function generate_series(
     p_stop in timestamp,
     p_step in yminterval_unconstrained := interval '1' month) return xtras_timestamps_t pipelined;
 
+-- Generate fibonacci numbers in a range
+function generate_fibonacci(
+    p_min in number,
+    p_max in number) return xtras_numbers_t pipelined;
+
+-- Generate the first N fibonacci numbers
+function generate_fibonacci(
+    p_length in pls_integer) return xtras_numbers_t pipelined;
+
 end xtras_generators;
 /
