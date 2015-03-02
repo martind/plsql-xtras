@@ -178,5 +178,109 @@ begin
     end loop;
 end generate_fibonacci;
 
+-- Generate prime numbers in a range
+-- Segmented sieve of Eratosthenes used to find primes in range [a, b]
+
+-- Steps
+-- 1) find all the primes up to sqrt(b), call them primes[]
+-- 2) create a boolean array is_prime[] with length = b-a+1 and fill it with true
+-- 3) for each p in primes set is_prime[i*p - a] = false starting at i=ceil(a/p)
+-- 4) for each is_prime[i]=true print i+a
+function generate_primes(
+    p_min in number,
+    p_max in number,
+    p_segment_size number := 32000) return xtras_numbers_t deterministic pipelined
+as
+    type primes_t is table of number;
+    type bool_primes_t is table of boolean;
+    
+    primes primes_t := primes_t();
+    is_prime bool_primes_t;
+    
+    seed_primes_size number := ceil(sqrt(p_max));
+begin
+    -- checking bogus parameters
+    if (p_min is null) or 
+       (p_max is null) or 
+       (p_max <= p_min) or 
+       (p_segment_size is null) or
+       (p_segment_size <= 0) 
+    then
+        return;
+    end if;
+    
+    -- find all the primes up to sqrt(p_max)
+    is_prime := bool_primes_t();
+    is_prime.extend(seed_primes_size);
+    for i in 1 .. is_prime.count loop
+        is_prime(i) := true;
+    end loop;
+    
+    for i in 2 .. seed_primes_size loop
+        if is_prime(i) then
+            primes.extend;
+            primes(primes.last) := i;
+            
+            declare
+                j pls_integer := i * i;
+            begin
+                while j <= seed_primes_size loop
+                    is_prime(j) := false;
+                    j := j + i;
+                end loop;
+            end;
+        end if;
+    end loop;
+    
+    -- if the requested range is overlapping with the seeding primes, pipe them
+    -- before they are marked as non-prime in the next cycle
+    if p_min <= seed_primes_size then
+        for prime_idx in 1 .. primes.count loop
+            if primes(prime_idx) >= p_min then
+                pipe row (primes(prime_idx));
+            end if;
+        end loop;
+    end if;
+    
+    -- for each p in primes set is_prime[i*p - p_min] = false starting at i=ceil(p_min/p)
+    -- we also split the original range in subranges so that we don't allocate too much memory
+    declare
+        l_segment_min number := p_min;
+        l_segment_max number := least(l_segment_min + p_segment_size - 1, p_max);
+    begin
+        loop
+            is_prime := bool_primes_t();
+            is_prime.extend(l_segment_max - l_segment_min);
+            for i in 1 .. is_prime.count loop
+                is_prime(i) := true;
+            end loop;
+            
+            for prime_idx in 1 .. primes.count loop
+                declare
+                    prime number := primes(prime_idx);
+                    i pls_integer := ceil(l_segment_min / prime);
+                    next_idx pls_integer := i * prime - l_segment_min + 1;
+                begin
+                    while next_idx <= is_prime.count loop
+                        is_prime(next_idx) := false;
+                        next_idx := next_idx + prime;
+                    end loop;
+                end;
+            end loop;
+            
+            -- for each is_prime[i]=true print i+l_segment_min
+            for i in 1 .. is_prime.count loop
+                if is_prime(i) and l_segment_min + i - 1 > 1 then
+                    pipe row (l_segment_min + i - 1);
+                end if;
+            end loop;
+            
+            l_segment_min := l_segment_max + 1;
+            l_segment_max := least(l_segment_min + p_segment_size - 1, p_max);
+            exit when l_segment_min >= p_max;
+        end loop;
+    end;
+end generate_primes;
+
 end xtras_generators;
 /

@@ -61,5 +61,11 @@ function generate_fibonacci(
 function generate_fibonacci(
     p_length in pls_integer) return xtras_numbers_t pipelined;
 
+-- Generate prime numbers in a range
+function generate_primes(
+    p_min in number,
+    p_max in number,
+    p_segment_size number := 32000) return xtras_numbers_t deterministic pipelined;
+
 end xtras_generators;
 /
